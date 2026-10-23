@@ -1,0 +1,60 @@
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-todo_db}
+      MYSQL_USER: ${MYSQL_USER:-todo_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-TodoDev2026abc}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDev2026xyz}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mysqladmin ping -h localhost -p"$${MYSQL_ROOT_PASSWORD}"'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-todo_user}:${MYSQL_PASSWORD:-TodoDev2026abc}@db:3306/${MYSQL_DATABASE:-todo_db}
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin12345}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  mysql_data:
+  prometheus_data:
+  grafana_data:
